@@ -1,0 +1,34 @@
+# Copy this file to config.yaml and adjust settings for your environment.
+# The watch_directory is the only required field to change.
+
+# Folder to scan for video files
+watch_directory: "F:\\Recordings"
+
+# How often to poll the watch directory (hours)
+poll_interval_hours: 3
+
+# Maximum uploads per UTC day (YouTube quota: ~6 uploads at standard quality)
+max_daily_uploads: 6
+
+# Maximum uploads to attempt in a single polling run
+uploads_per_run: 2
+
+# Upload chunk size in megabytes (larger = fewer requests, more memory)
+chunk_size_mb: 10
+
+# Skip files modified within this many minutes (guards against uploading files still being written)
+recent_write_threshold_minutes: 30
+
+# Delete local file after a confirmed successful upload
+delete_after_upload: true
+
+# YouTube privacy setting: "private", "unlisted", or "public"
+privacy_status: "private"
+
+# File extensions to consider for upload
+video_extensions:
+  - ".mp4"
+  - ".mkv"
+  - ".avi"
+  - ".mov"
+  - ".webm"
