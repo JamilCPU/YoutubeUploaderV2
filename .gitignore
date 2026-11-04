@@ -18,3 +18,17 @@ build/
 
 -version
 .coverage
+.env.*
+!.env.example
+*.keys
+*.db
+*.sqlite
+*.sqlite3
+node_modules/
+bin/
+obj/
+.vs/
+.idea/
+*.class
+target/
+*.coverage
