@@ -104,6 +104,8 @@ def _execute_resumable(
     tracker = UploadProgressTracker(video_file.size_bytes, video_file.name)
     retries = 0
     response = None
+    last_logged_pct = -1
+    last_log_time = time.monotonic()
 
     while response is None:
         try:
@@ -123,9 +125,28 @@ def _execute_resumable(
                 continue
             raise
 
-        if status is not None and progress_callback is not None:
+        if status is not None:
             progress = tracker.update(status.resumable_progress)
-            progress_callback(progress)
+
+            if progress_callback is not None:
+                progress_callback(progress)
+
+            # Log every 5% boundary crossed OR every 60 seconds, whichever comes first
+            pct_bucket = int(progress.percent / 5) * 5
+            now = time.monotonic()
+            if pct_bucket > last_logged_pct or (now - last_log_time) >= 60:
+                from src.progress import format_eta
+                log.info(
+                    "Uploading %s - %d%% (%.1f / %.1f GB) | %.1f MB/s | ETA: %s",
+                    video_file.name,
+                    int(progress.percent),
+                    progress.bytes_uploaded / (1024 ** 3),
+                    progress.total_bytes / (1024 ** 3),
+                    progress.speed_mb,
+                    format_eta(progress.eta_seconds),
+                )
+                last_logged_pct = pct_bucket
+                last_log_time = now
 
         # Reset retry counter on successful chunk
         retries = 0
@@ -139,19 +160,25 @@ def _execute_resumable(
 def _title_from_filename(path: Path) -> str:
     """Convert a filename like '2024-01-15 14-30-00.mp4' to '01/15/2024 - 2:30 PM'.
 
+    Also handles split files: '2024-01-15 14-30-00 Part 2.mp4' becomes
+    '01/15/2024 - 2:30 PM Part 2'.
+
     Falls back to the stem (filename without extension) if parsing fails.
     """
-    stem = path.stem
-    try:
-        dt = datetime.strptime(stem, "%Y-%m-%d %H-%M-%S")
-        return dt.strftime("%m/%d/%Y - %I:%M %p")
-    except ValueError:
-        pass
+    import re
 
-    try:
-        dt = datetime.strptime(stem, "%Y-%m-%d_%H-%M-%S")
-        return dt.strftime("%m/%d/%Y - %I:%M %p")
-    except ValueError:
-        pass
+    stem = path.stem
+
+    # Extract optional "Part N" suffix
+    part_match = re.match(r"^(.+?)\s+(Part\s+\d+)$", stem)
+    base = part_match.group(1) if part_match else stem
+    part_suffix = f" {part_match.group(2)}" if part_match else ""
+
+    for fmt in ("%Y-%m-%d %H-%M-%S", "%Y-%m-%d_%H-%M-%S"):
+        try:
+            dt = datetime.strptime(base, fmt)
+            return dt.strftime("%m/%d/%Y - %I:%M %p") + part_suffix
+        except ValueError:
+            continue
 
     return stem

@@ -89,6 +89,8 @@ def _build_config(raw: dict, credentials: dict[str, str]) -> AppConfig:
         delete_after_upload=bool(raw.get("delete_after_upload", True)),
         privacy_status=str(raw.get("privacy_status", "private")),
         video_extensions=extensions,
+        max_duration_hours=float(raw.get("max_duration_hours", 11.5)),
+        processing_timeout_minutes=int(raw.get("processing_timeout_minutes", 120)),
         client_id=credentials["client_id"],
         client_secret=credentials["client_secret"],
         project_id=credentials["project_id"],

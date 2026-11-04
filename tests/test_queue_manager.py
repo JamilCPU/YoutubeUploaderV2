@@ -82,6 +82,13 @@ def test_is_already_processed_uploaded(tmp_state_file: Path) -> None:
     assert qm.is_already_processed(state, p) is True
 
 
+def test_is_already_processed_uploading(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/video.mp4")
+    state = qm.mark_uploading(state, p)
+    assert qm.is_already_processed(state, p) is True
+
+
 def test_is_already_processed_pending(tmp_state_file: Path) -> None:
     state = qm.load_state()
     p = Path("/video.mp4")
@@ -96,6 +103,27 @@ def test_reset_failed(tmp_state_file: Path) -> None:
     assert qm.get_file_status(state, p) == qm.STATUS_PENDING
 
 
+def test_reset_failed_clears_possibly_uploaded(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/video.mp4")
+    state = qm.mark_failed(state, p, "err")
+    # Manually set possibly_uploaded flag (as stuck detector would)
+    state["uploads"][str(p)]["possibly_uploaded"] = True
+    assert qm.is_already_processed(state, p) is True  # blocked before reset
+    state = qm.reset_failed(state)
+    assert state["uploads"][str(p)].get("possibly_uploaded") is None
+    assert qm.is_already_processed(state, p) is False  # allowed after reset
+
+
+def test_possibly_uploaded_blocks_retry(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/video.mp4")
+    state = qm.mark_failed(state, p, "timed out")
+    state["uploads"][str(p)]["possibly_uploaded"] = True
+    # Must not be retried automatically even though status is FAILED
+    assert qm.is_already_processed(state, p) is True
+
+
 def test_save_and_reload(tmp_state_file: Path) -> None:
     state = qm.load_state()
     p = Path("/video.mp4")
@@ -108,10 +136,10 @@ def test_save_and_reload(tmp_state_file: Path) -> None:
 
 
 def test_stuck_upload_recovery(tmp_path: Path, tmp_state_file: Path) -> None:
-    # Manually write a state with a stuck UPLOADING entry (started 3 hours ago)
+    # Manually write a state with a stuck UPLOADING entry (started 25 hours ago)
     stuck_path = tmp_path / "stuck.mp4"
     stuck_key = str(stuck_path)
-    stuck_time = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+    stuck_time = (datetime.now(timezone.utc) - timedelta(hours=25)).isoformat()
     state_data = {
         "uploads": {
             stuck_key: {
@@ -124,3 +152,49 @@ def test_stuck_upload_recovery(tmp_path: Path, tmp_state_file: Path) -> None:
     tmp_state_file.write_text(json.dumps(state_data))
     state = qm.load_state()
     assert qm.get_file_status(state, stuck_path) == qm.STATUS_FAILED
+    assert state["uploads"][stuck_key].get("possibly_uploaded") is True
+    # Must not be auto-retried even though status is FAILED
+    assert qm.is_already_processed(state, stuck_path) is True
+
+
+# ---------------------------------------------------------------------------
+# mark_too_long / mark_processing_failed / is_already_processed extensions
+# ---------------------------------------------------------------------------
+
+
+def test_mark_too_long(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/some/long_video.mp4")
+    state = qm.mark_too_long(state, p, 13.5)
+
+    assert qm.get_file_status(state, p) == qm.STATUS_TOO_LONG
+    entry = state["uploads"][str(p)]
+    assert entry["duration_hours"] == 13.5
+    assert "13.5" in entry["error"]
+
+
+def test_mark_processing_failed(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/some/bad_video.mp4")
+    state = qm.mark_processing_failed(state, p, "vid999", "codec not supported")
+
+    assert qm.get_file_status(state, p) == qm.STATUS_PROCESSING_FAILED
+    entry = state["uploads"][str(p)]
+    assert entry["video_id"] == "vid999"
+    assert entry["error"] == "codec not supported"
+
+
+def test_is_already_processed_too_long(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/some/long_video.mp4")
+    state = qm.mark_too_long(state, p, 14.0)
+
+    assert qm.is_already_processed(state, p) is True
+
+
+def test_is_already_processed_processing_failed(tmp_state_file: Path) -> None:
+    state = qm.load_state()
+    p = Path("/some/bad_video.mp4")
+    state = qm.mark_processing_failed(state, p, "vid888", "rejected")
+
+    assert qm.is_already_processed(state, p) is True

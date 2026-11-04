@@ -20,7 +20,8 @@ from rich.progress import (
 
 from src.models import UploadProgress
 
-console = Console()
+# Force UTF-8 so Braille spinner characters don't crash on Windows cp1252 streams
+console = Console(highlight=False)
 
 # Sliding window size for speed calculation (number of samples)
 _SPEED_WINDOW = 10
@@ -65,9 +66,13 @@ class UploadProgressTracker:
 
 
 def make_rich_progress() -> Progress:
-    """Create a Rich Progress instance configured for large file uploads."""
+    """Create a Rich Progress instance configured for large file uploads.
+
+    Uses the ASCII 'line' spinner (-\\|/) so the output is safe to redirect
+    to files on Windows systems using non-UTF-8 encodings (e.g. cp1252).
+    """
     return Progress(
-        SpinnerColumn(),
+        SpinnerColumn(spinner_name="line"),
         TextColumn("[bold blue]{task.description}"),
         BarColumn(bar_width=40),
         "[progress.percentage]{task.percentage:>5.1f}%",

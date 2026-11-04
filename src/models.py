@@ -18,6 +18,8 @@ class AppConfig:
     delete_after_upload: bool = True
     privacy_status: str = "private"
     video_extensions: tuple[str, ...] = (".mp4", ".mkv", ".avi", ".mov", ".webm")
+    max_duration_hours: float = 11.5
+    processing_timeout_minutes: int = 120
 
     # OAuth credentials (loaded from env vars)
     client_id: str = ""

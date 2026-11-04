@@ -109,3 +109,28 @@ def test_upload_calls_progress_callback(sample_video_file, sample_config: AppCon
 
     upload_video(service, sample_video_file, sample_config, progress_callback=callback)
     assert len(callback_calls) >= 1
+
+
+# ---------------------------------------------------------------------------
+# _title_from_filename — Part suffix tests
+# ---------------------------------------------------------------------------
+
+
+def test_title_with_part_suffix() -> None:
+    path = Path("2024-01-15 14-30-00 Part 1.mp4")
+    assert _title_from_filename(path) == "01/15/2024 - 02:30 PM Part 1"
+
+
+def test_title_with_part_suffix_high_number() -> None:
+    path = Path("2024-01-15 14-30-00 Part 12.mp4")
+    assert _title_from_filename(path) == "01/15/2024 - 02:30 PM Part 12"
+
+
+def test_title_underscore_with_part() -> None:
+    path = Path("2024-01-15_14-30-00 Part 3.mp4")
+    assert _title_from_filename(path) == "01/15/2024 - 02:30 PM Part 3"
+
+
+def test_title_non_datetime_with_part() -> None:
+    path = Path("my-recording Part 2.mp4")
+    assert _title_from_filename(path) == "my-recording Part 2"

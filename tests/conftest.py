@@ -63,6 +63,8 @@ def sample_config(tmp_watch_dir: Path) -> AppConfig:
         delete_after_upload=True,
         privacy_status="private",
         video_extensions=(".mp4",),
+        max_duration_hours=11.5,
+        processing_timeout_minutes=1,  # fast for tests
         client_id="test-client-id",
         client_secret="test-client-secret",
         project_id="test-project",

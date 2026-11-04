@@ -15,7 +15,10 @@ from src.models import AppConfig
 
 log = logging.getLogger(__name__)
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
+]
 TOKEN_PATH = Path("token.json")
 
 
@@ -28,7 +31,11 @@ def get_youtube_service(config: AppConfig) -> Resource:
 
 
 def _load_or_refresh_credentials() -> Credentials | None:
-    """Load cached credentials from token.json, refreshing if expired."""
+    """Load cached credentials from token.json, refreshing if expired.
+
+    Forces re-authentication if the stored token is missing required scopes
+    (e.g. after adding youtube.readonly for processing status checks).
+    """
     if not TOKEN_PATH.exists():
         return None
 
@@ -36,6 +43,15 @@ def _load_or_refresh_credentials() -> Credentials | None:
         credentials = Credentials.from_authorized_user_file(str(TOKEN_PATH), SCOPES)
     except Exception as exc:
         log.warning("Failed to load token.json: %s — will re-authenticate", exc)
+        return None
+
+    # Check that all required scopes are present
+    if not credentials.scopes or not set(SCOPES).issubset(credentials.scopes):
+        missing = set(SCOPES) - set(credentials.scopes or set())
+        log.warning(
+            "Token missing scopes %s — will re-authenticate to acquire them",
+            missing,
+        )
         return None
 
     if credentials.valid:

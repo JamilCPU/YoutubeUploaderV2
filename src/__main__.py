@@ -7,6 +7,8 @@ Usage:
     python -m src status            # Print queue summary and exit
     python -m src auth              # Run interactive OAuth flow and save token
     python -m src reset-failed      # Reset all failed uploads to pending
+    python -m src split-watch       # Start the video splitter daemon
+    python -m src split-once        # Single split cycle then exit
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from rich.logging import RichHandler
 from src import auth, queue_manager as qm
 from src.config import load_config
 from src.scheduler import print_status, run_forever, run_once
+from src.splitter import run_splitter_forever, run_splitter_once
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -58,6 +61,16 @@ def _cmd_auth(args: argparse.Namespace) -> None:
     print("Authentication successful. Token saved.")
 
 
+def _cmd_split_watch(args: argparse.Namespace) -> None:
+    config = load_config(Path(args.config) if args.config else None)
+    run_splitter_forever(config)
+
+
+def _cmd_split_once(args: argparse.Namespace) -> None:
+    config = load_config(Path(args.config) if args.config else None)
+    run_splitter_once(config)
+
+
 def _cmd_reset_failed(args: argparse.Namespace) -> None:
     state = qm.load_state()
     before = qm.get_queue_summary(state)
@@ -83,6 +96,8 @@ def main() -> None:
     subparsers.add_parser("status", help="Print queue summary")
     subparsers.add_parser("auth", help="Run interactive OAuth flow")
     subparsers.add_parser("reset-failed", help="Reset failed uploads to pending")
+    subparsers.add_parser("split-watch", help="Start the video splitter daemon")
+    subparsers.add_parser("split-once", help="Run one split cycle then exit")
 
     args = parser.parse_args()
     _setup_logging(args.verbose)
@@ -94,6 +109,8 @@ def main() -> None:
         "status": _cmd_status,
         "auth": _cmd_auth,
         "reset-failed": _cmd_reset_failed,
+        "split-watch": _cmd_split_watch,
+        "split-once": _cmd_split_once,
     }
 
     try:
